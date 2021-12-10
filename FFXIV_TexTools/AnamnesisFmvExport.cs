@@ -45,6 +45,7 @@ namespace FFXIV_TexTools
 			try
 			{
                 await MainWin.LockUi("Exporting Anamnesis Character", "....", LockObj);
+                MainWin.LockProgress.Report("Loading chara file...");
 
                 // red chara file
                 string json = File.ReadAllText(path);
@@ -52,9 +53,11 @@ namespace FFXIV_TexTools
                 XivRace race = character.GetXivRace();
 
                 // load all items we can
-				List<IItem> allItems = await XivCache.GetFullItemList();
+                MainWin.LockProgress.Report("Loading items...");
+                List<IItem> allItems = await XivCache.GetFullItemList();
 
                 // load the Fmv
+                MainWin.LockProgress.Report("Starting FMV...");
                 Fmv = FullModelView.Instance;
                 Fmv.Owner = MainWin;
                 Fmv.Show();
@@ -62,15 +65,25 @@ namespace FFXIV_TexTools
                 await Task.Delay(500);
 
                 // Start adding models to the fmv
+                MainWin.LockProgress.Report("Loading Item: Head");
                 await AddToFmv(GetModel(allItems, character.HeadGear, "Head"), race);
+                MainWin.LockProgress.Report("Loading Item: Body");
                 await AddToFmv(GetModel(allItems, character.Body, "Body"), race);
+                MainWin.LockProgress.Report("Loading Item: Hands");
                 await AddToFmv(GetModel(allItems, character.Hands, "Hands"), race);
+                MainWin.LockProgress.Report("Loading Item: Legs");
                 await AddToFmv(GetModel(allItems, character.Legs, "Legs"), race);
+                MainWin.LockProgress.Report("Loading Item: Feet");
                 await AddToFmv(GetModel(allItems, character.Feet, "Feet"), race);
+                MainWin.LockProgress.Report("Loading Item: Earring");
                 await AddToFmv(GetModel(allItems, character.Ears, "Earring"), race);
+                MainWin.LockProgress.Report("Loading Item: Neck");
                 await AddToFmv(GetModel(allItems, character.Neck, "Neck"), race);
+                MainWin.LockProgress.Report("Loading Item: Wrists");
                 await AddToFmv(GetModel(allItems, character.Wrists, "Wrists"), race);
+                MainWin.LockProgress.Report("Loading Item: Left Ring");
                 await AddToFmv(GetModel(allItems, character.LeftRing, "Rings"), race);
+                MainWin.LockProgress.Report("Loading Item: Right Ring");
                 await AddToFmv(GetModel(allItems, character.RightRing, "Rings"), race);
             }
 			catch (Exception ex)
@@ -112,12 +125,28 @@ namespace FFXIV_TexTools
 
 			Mdl _mdl = new Mdl(GameDirectory, item.DataFile);
 
-			TTModel model = await _mdl.GetModel(item, race);
+            TTModel model = null;
+
+			List<XivRace> priority = race.GetModelPriorityList();
+            XivRace actualRace = race;
+            foreach (XivRace newRace in priority)
+			{
+                model = await _mdl.GetModel(item, newRace);
+                actualRace = newRace;
+
+                if (model != null)
+                {
+                    break;
+                }
+            }
+
+            if (model == null)
+                throw new Exception($"Failed to get model for item: {item}");
 
             Dictionary<int, ModelTextureData> textureData = await GetMaterials(item, model, race);
 
-			await Fmv.AddModel(model, textureData, item, race);
-            await Task.Delay(3000);
+			await Fmv.AddModel(model, textureData, item, actualRace);
+            await Task.Delay(4000);
 		}
 
         // Taken from ModelViewModel:1771
@@ -456,9 +485,9 @@ namespace FFXIV_TexTools
 
             public XivRace GetXivRace()
 			{
-                if (this.Race == Races.Hyur && this.Tribe == Tribes.Midlander && this.Gender == Genders.Feminine) return XivRace.Hyur_Midlander_Male;
+                if (this.Race == Races.Hyur && this.Tribe == Tribes.Midlander && this.Gender == Genders.Masculine) return XivRace.Hyur_Midlander_Male;
                 if (this.Race == Races.Hyur && this.Tribe == Tribes.Midlander && this.Gender == Genders.Feminine) return XivRace.Hyur_Midlander_Female;
-                if (this.Race == Races.Hyur && this.Tribe == Tribes.Highlander && this.Gender == Genders.Feminine) return XivRace.Hyur_Highlander_Male;
+                if (this.Race == Races.Hyur && this.Tribe == Tribes.Highlander && this.Gender == Genders.Masculine) return XivRace.Hyur_Highlander_Male;
                 if (this.Race == Races.Hyur && this.Tribe == Tribes.Highlander && this.Gender == Genders.Feminine) return XivRace.Hyur_Highlander_Female;
                 if (this.Race == Races.Elezen && this.Gender == Genders.Masculine) return XivRace.Elezen_Male;
                 if (this.Race == Races.Elezen && this.Gender == Genders.Feminine) return XivRace.Elezen_Female;
