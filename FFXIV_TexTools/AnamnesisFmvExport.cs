@@ -44,14 +44,23 @@ namespace FFXIV_TexTools
 			{
                 await MainWin.LockUi("Exporting Anamnesis Character", "....", LockObj);
 
-                await Task.Delay(5000);
-
                 string json = File.ReadAllText(path);
 				CharacterFile character = JsonConvert.DeserializeObject<CharacterFile>(json);
 
                 XivRace race = character.GetXivRace();
 
 				List<IItem> allItems = await XivCache.GetFullItemList();
+
+                await AddToFmv(GetModel(allItems, character.HeadGear, "Head"), race);
+                await AddToFmv(GetModel(allItems, character.Body, "Body"), race);
+                await AddToFmv(GetModel(allItems, character.Hands, "Hands"), race);
+                await AddToFmv(GetModel(allItems, character.Legs, "Legs"), race);
+                await AddToFmv(GetModel(allItems, character.Feet, "Feet"), race);
+                await AddToFmv(GetModel(allItems, character.Ears, "Earring"), race);
+                await AddToFmv(GetModel(allItems, character.Neck, "Neck"), race);
+                await AddToFmv(GetModel(allItems, character.Wrists, "Wrists"), race);
+                await AddToFmv(GetModel(allItems, character.LeftRing, "Rings"), race);
+                await AddToFmv(GetModel(allItems, character.RightRing, "Rings"), race);
             }
 			catch (Exception ex)
 			{
@@ -63,8 +72,33 @@ namespace FFXIV_TexTools
             }
 		}
 
+
+        private static IItemModel GetModel(List<IItem> allItems, CharacterFile.ItemSave itemSave, string category)
+		{
+            if (itemSave.ModelBase == 0 && itemSave.ModelVariant == 0)
+                return null;
+
+            foreach(IItem item in allItems)
+			{
+                if (item is IItemModel itemModel)
+				{
+                    if (itemModel.ModelInfo.PrimaryID == itemSave.ModelBase &&
+                        itemModel.ModelInfo.ImcSubsetID == itemSave.ModelVariant &&
+                        itemModel.SecondaryCategory == category)
+					{
+                        return itemModel;
+					}
+                }
+			}
+
+            throw new Exception($"Could not find model for item save: {itemSave}");
+		}
+
 		private static async Task AddToFmv(IItemModel item, XivRace race)
 		{
+            if (item == null)
+                return;
+
 			Mdl _mdl = new Mdl(GameDirectory, item.DataFile);
 
 			TTModel model = await _mdl.GetModel(item, race);
