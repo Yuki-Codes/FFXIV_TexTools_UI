@@ -220,11 +220,11 @@ namespace FFXIV_TexTools
             Mdl _mdl = new Mdl(GameDirectory, item.DataFile);
 
             TTModel model = await _mdl.GetModel(item, race);
+            XivRace actualRace = race;
 
             if (model == null)
             {
                 List<XivRace> priority = race.GetModelPriorityList();
-                XivRace actualRace = race;
                 foreach (XivRace newRace in priority)
                 {
                     model = await _mdl.GetModel(item, newRace);
