@@ -117,6 +117,7 @@ namespace FFXIV_TexTools
             Dictionary<int, ModelTextureData> textureData = await GetMaterials(item, model, race);
 
 			await Fmv.AddModel(model, textureData, item, race);
+            await Task.Delay(3000);
 		}
 
         // Taken from ModelViewModel:1771
