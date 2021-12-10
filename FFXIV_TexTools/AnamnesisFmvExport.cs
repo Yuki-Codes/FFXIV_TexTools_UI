@@ -64,30 +64,40 @@ namespace FFXIV_TexTools
 
                 await Task.Delay(500);
 
+                // Body
                 MainWin.LockProgress.Report("Loading Face");
-                await AddToFmv(GetModel(allItems, race, character.Head, character.Eyebrows, character.Eyes, character.Nose, character.Jaw, character.Mouth), race);
+                await AddToFmv(GetFaceModel(allItems, race, character.Head, character.Eyebrows, character.Eyes, character.Nose, character.Jaw, character.Mouth), race);
+                MainWin.LockProgress.Report("Loading Hair");
+                await AddToFmv(GetHairModel(allItems, race, character.Hair), race);
 
-                // Start adding models to the fmv
+                // Gear
                 MainWin.LockProgress.Report("Loading Item: Head");
-                await AddToFmv(GetModel(allItems, character.HeadGear, "Head"), race);
+                await AddToFmv(GetItemModel(allItems, character.HeadGear, "Head"), race);
                 MainWin.LockProgress.Report("Loading Item: Body");
-                await AddToFmv(GetModel(allItems, character.Body, "Body"), race);
+                await AddToFmv(GetItemModel(allItems, character.Body, "Body"), race);
                 MainWin.LockProgress.Report("Loading Item: Hands");
-                await AddToFmv(GetModel(allItems, character.Hands, "Hands"), race);
+                await AddToFmv(GetItemModel(allItems, character.Hands, "Hands"), race);
                 MainWin.LockProgress.Report("Loading Item: Legs");
-                await AddToFmv(GetModel(allItems, character.Legs, "Legs"), race);
+                await AddToFmv(GetItemModel(allItems, character.Legs, "Legs"), race);
                 MainWin.LockProgress.Report("Loading Item: Feet");
-                await AddToFmv(GetModel(allItems, character.Feet, "Feet"), race);
+                await AddToFmv(GetItemModel(allItems, character.Feet, "Feet"), race);
                 MainWin.LockProgress.Report("Loading Item: Earring");
-                await AddToFmv(GetModel(allItems, character.Ears, "Earring"), race);
+                await AddToFmv(GetItemModel(allItems, character.Ears, "Earring"), race);
                 MainWin.LockProgress.Report("Loading Item: Neck");
-                await AddToFmv(GetModel(allItems, character.Neck, "Neck"), race);
+                await AddToFmv(GetItemModel(allItems, character.Neck, "Neck"), race);
                 MainWin.LockProgress.Report("Loading Item: Wrists");
-                await AddToFmv(GetModel(allItems, character.Wrists, "Wrists"), race);
+                await AddToFmv(GetItemModel(allItems, character.Wrists, "Wrists"), race);
                 MainWin.LockProgress.Report("Loading Item: Left Ring");
-                await AddToFmv(GetModel(allItems, character.LeftRing, "Rings"), race);
+                await AddToFmv(GetItemModel(allItems, character.LeftRing, "Rings"), race);
                 MainWin.LockProgress.Report("Loading Item: Right Ring");
-                await AddToFmv(GetModel(allItems, character.RightRing, "Rings"), race);
+                await AddToFmv(GetItemModel(allItems, character.RightRing, "Rings"), race);
+
+                // Weapons
+                // Weapons crash the FMV, even normally a user cnat add a weapon to the FMV for some reason.
+                /*MainWin.LockProgress.Report("Loading Weapon: Main Hand");
+                await AddToFmv(GetWeaponModel(allItems, character.MainHand, true), race);
+                MainWin.LockProgress.Report("Loading Weapon: Off Hand");
+                await AddToFmv(GetWeaponModel(allItems, character.OffHand, false), race);*/
             }
 			catch (Exception ex)
 			{
@@ -99,7 +109,35 @@ namespace FFXIV_TexTools
             }
 		}
 
-        private static IItemModel GetModel(List<IItem> allItems, XivRace race, byte head, byte eyebrows, byte eyes, byte nose, byte jaw, byte mouth)
+        private static IItemModel GetHairModel(List<IItem> allItems, XivRace race, byte hair)
+		{
+            int raceCode = int.Parse(race.GetRaceCode());
+
+            foreach (IItem item in allItems)
+            {
+                if (item is IItemModel itemModel)
+                {
+                    if (item.PrimaryCategory != "Character")
+                        continue;
+
+                    if (item.SecondaryCategory != "Hair")
+                        continue;
+
+                    if (itemModel.ModelInfo.PrimaryID != raceCode)
+                        continue;
+
+                    XivCharacter faceItem = (XivCharacter)itemModel.Clone();
+
+                    faceItem.ModelInfo = new XivModelInfo();
+                    faceItem.ModelInfo.SecondaryID = hair;
+                    return faceItem;
+                }
+            }
+
+            throw new Exception($"Failed to find hair model: {race}, {hair}");
+        }
+
+        private static IItemModel GetFaceModel(List<IItem> allItems, XivRace race, byte head, byte eyebrows, byte eyes, byte nose, byte jaw, byte mouth)
 		{
             int raceCode = int.Parse(race.GetRaceCode());
 
@@ -127,7 +165,7 @@ namespace FFXIV_TexTools
             throw new Exception($"Failed to find face model: {race}, {head}");
 		}
 
-        private static IItemModel GetModel(List<IItem> allItems, CharacterFile.ItemSave itemSave, string category)
+        private static IItemModel GetItemModel(List<IItem> allItems, CharacterFile.ItemSave itemSave, string category)
 		{
             if (itemSave.ModelBase == 0 && itemSave.ModelVariant == 0)
                 return null;
@@ -151,12 +189,35 @@ namespace FFXIV_TexTools
             throw new Exception($"Could not find model for item save: {itemSave}");
 		}
 
-		private static async Task AddToFmv(IItemModel item, XivRace race)
+        private static IItemModel GetWeaponModel(List<IItem> allItems, CharacterFile.WeaponSave weaponSave, bool mainHand)
+        {
+            if (weaponSave.ModelSet == 0 && weaponSave.ModelBase == 0 && weaponSave.ModelVariant == 0)
+                return null;
+
+            foreach (IItem item in allItems)
+            {
+                if (item is XivGear itemModel)
+                {
+                    if (itemModel.ModelInfo.PrimaryID == weaponSave.ModelSet &&
+                        itemModel.ModelInfo.SecondaryID == weaponSave.ModelBase &&
+                        itemModel.ModelInfo.ImcSubsetID == weaponSave.ModelVariant)
+                    {
+                        return mainHand ? itemModel : itemModel.PairedItem;
+                    }
+                }
+            }
+
+            throw new Exception($"Could not find model for weapon save: {weaponSave}");
+        }
+
+        private static async Task AddToFmv(IItemModel item, XivRace race)
 		{
             if (item == null)
                 return;
 
-			Mdl _mdl = new Mdl(GameDirectory, item.DataFile);
+            MainWin.LockProgress.Report($"Loading FMV: {item.Name}");
+
+            Mdl _mdl = new Mdl(GameDirectory, item.DataFile);
 
             TTModel model = null;
 
