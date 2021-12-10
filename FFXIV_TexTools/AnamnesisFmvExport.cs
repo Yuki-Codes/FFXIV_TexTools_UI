@@ -67,6 +67,8 @@ namespace FFXIV_TexTools
                 // Body
                 MainWin.LockProgress.Report("Loading Face");
                 await AddToFmv(GetFaceModel(allItems, race, character.Head, character.Eyebrows, character.Eyes, character.Nose, character.Jaw, character.Mouth), race);
+                MainWin.LockProgress.Report("Loading Ears/Tail");
+                await AddToFmv(GetEarsTailModel(allItems, race, character.TailEarsType), race);
                 MainWin.LockProgress.Report("Loading Hair");
                 await AddToFmv(GetHairModel(allItems, race, character.Hair), race);
 
@@ -165,6 +167,37 @@ namespace FFXIV_TexTools
             throw new Exception($"Failed to find face model: {race}, {head}");
 		}
 
+        private static IItemModel GetEarsTailModel(List<IItem> allItems, XivRace race, byte id)
+        {
+            int raceCode = int.Parse(race.GetRaceCode());
+
+            if (id == 0)
+                id = 1;
+
+            foreach (IItem item in allItems)
+            {
+                if (item is IItemModel itemModel)
+                {
+                    if (item.PrimaryCategory != "Character")
+                        continue;
+
+                    if (item.SecondaryCategory != "Ear" && item.SecondaryCategory != "Tail")
+                        continue;
+
+                    if (itemModel.ModelInfo.PrimaryID != raceCode)
+                        continue;
+
+                    XivCharacter earTailItem = (XivCharacter)itemModel.Clone();
+
+                    earTailItem.ModelInfo = new XivModelInfo();
+                    earTailItem.ModelInfo.SecondaryID = id;
+                    return earTailItem;
+                }
+            }
+
+            throw new Exception($"Failed to find Ears/Tail model: {race}, {id}");
+        }
+
         private static IItemModel GetItemModel(List<IItem> allItems, CharacterFile.ItemSave itemSave, string category)
 		{
             if (itemSave.ModelBase == 0 && itemSave.ModelVariant == 0)
@@ -214,8 +247,6 @@ namespace FFXIV_TexTools
 		{
             if (item == null)
                 return;
-
-            MainWin.LockProgress.Report($"Loading FMV: {item.Name}");
 
             Mdl _mdl = new Mdl(GameDirectory, item.DataFile);
 
