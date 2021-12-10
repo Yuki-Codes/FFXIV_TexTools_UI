@@ -27,6 +27,8 @@ namespace FFXIV_TexTools
         private static MainWindow MainWin = MainWindow.GetMainWindow();
         private static object LockObj = new object();
 
+        private static FullModelView Fmv;
+
         public static void Run()
 		{
             OpenFileDialog dlg = new OpenFileDialog();
@@ -44,13 +46,22 @@ namespace FFXIV_TexTools
 			{
                 await MainWin.LockUi("Exporting Anamnesis Character", "....", LockObj);
 
+                // red chara file
                 string json = File.ReadAllText(path);
 				CharacterFile character = JsonConvert.DeserializeObject<CharacterFile>(json);
-
                 XivRace race = character.GetXivRace();
 
+                // load all items we can
 				List<IItem> allItems = await XivCache.GetFullItemList();
 
+                // load the Fmv
+                Fmv = FullModelView.Instance;
+                Fmv.Owner = MainWin;
+                Fmv.Show();
+
+                await Task.Delay(500);
+
+                // Start adding models to the fmv
                 await AddToFmv(GetModel(allItems, character.HeadGear, "Head"), race);
                 await AddToFmv(GetModel(allItems, character.Body, "Body"), race);
                 await AddToFmv(GetModel(allItems, character.Hands, "Hands"), race);
@@ -105,15 +116,11 @@ namespace FFXIV_TexTools
 
             Dictionary<int, ModelTextureData> textureData = await GetMaterials(item, model, race);
 
-			FullModelView fmv = FullModelView.Instance;
-            fmv.Owner = MainWin;
-            fmv.Show();
-
-			await fmv.AddModel(model, textureData, item, race);
+			await Fmv.AddModel(model, textureData, item, race);
 		}
 
         // Taken from ModelViewModel:1771
-        private static async Task<Dictionary<int, ModelTextureData>> GetMaterials(IItemModel mtrlItem, TTModel model, XivRace race)
+        private static async Task<Dictionary<int, ModelTextureData>> GetMaterials(IItemModel item, TTModel model, XivRace race)
         {
 			Dictionary<int, ModelTextureData> textureDataDictionary = new Dictionary<int, ModelTextureData>();
             if (model == null)
@@ -126,7 +133,9 @@ namespace FFXIV_TexTools
 			int materialNum = 0;
             foreach (string mtrlFilePath in mtrlFilePaths)
             {
-				int modelID = mtrlItem.ModelInfo.PrimaryID;
+				IItemModel mtrlItem = (IItemModel)item.Clone();
+
+                int modelID = mtrlItem.ModelInfo.PrimaryID;
 				int bodyID = mtrlItem.ModelInfo.SecondaryID;
 				string filePath = mtrlFilePath;
 
