@@ -64,6 +64,9 @@ namespace FFXIV_TexTools
 
                 await Task.Delay(500);
 
+                MainWin.LockProgress.Report("Loading Face");
+                await AddToFmv(GetModel(allItems, race, character.Head, character.Eyebrows, character.Eyes, character.Nose, character.Jaw, character.Mouth), race);
+
                 // Start adding models to the fmv
                 MainWin.LockProgress.Report("Loading Item: Head");
                 await AddToFmv(GetModel(allItems, character.HeadGear, "Head"), race);
@@ -96,6 +99,33 @@ namespace FFXIV_TexTools
             }
 		}
 
+        private static IItemModel GetModel(List<IItem> allItems, XivRace race, byte head, byte eyebrows, byte eyes, byte nose, byte jaw, byte mouth)
+		{
+            int raceCode = int.Parse(race.GetRaceCode());
+
+            foreach (IItem item in allItems)
+			{
+                if (item is IItemModel itemModel)
+                {
+                    if (item.PrimaryCategory != "Character")
+                        continue;
+
+                    if (item.SecondaryCategory != "Face")
+                        continue;
+
+                    if (itemModel.ModelInfo.PrimaryID != raceCode)
+                        continue;
+
+                    XivCharacter faceItem = (XivCharacter)itemModel.Clone();
+
+                    faceItem.ModelInfo = new XivModelInfo();
+                    faceItem.ModelInfo.SecondaryID = head;
+                    return faceItem;
+                }
+			}
+
+            throw new Exception($"Failed to find face model: {race}, {head}");
+		}
 
         private static IItemModel GetModel(List<IItem> allItems, CharacterFile.ItemSave itemSave, string category)
 		{
@@ -104,6 +134,9 @@ namespace FFXIV_TexTools
 
             foreach(IItem item in allItems)
 			{
+                if (item.PrimaryCategory != "Gear")
+                    continue;
+
                 if (item is IItemModel itemModel)
 				{
                     if (itemModel.ModelInfo.PrimaryID == itemSave.ModelBase &&
