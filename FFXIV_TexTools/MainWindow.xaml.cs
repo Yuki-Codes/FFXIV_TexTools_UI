@@ -1780,5 +1780,10 @@ namespace FFXIV_TexTools
             wind.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             wind.Show();
         }
-    }
+
+		private void Menu_AnamnesisFmv_Click(object sender, RoutedEventArgs e)
+		{
+            AnamnesisFmvExport.Run();
+        }
+	}
 }
