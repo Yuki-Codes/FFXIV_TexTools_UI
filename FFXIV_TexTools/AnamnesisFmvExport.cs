@@ -17,9 +17,6 @@ using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
-
-using WinColor = System.Windows.Media.Color;
-using ColorConverter = System.Windows.Media.ColorConverter;
 using xivModdingFramework.Models.ModelTextures;
 
 namespace FFXIV_TexTools
@@ -27,6 +24,8 @@ namespace FFXIV_TexTools
 	internal static class AnamnesisFmvExport
 	{
         private static DirectoryInfo GameDirectory = new DirectoryInfo(Settings.Default.FFXIV_Directory);
+        private static MainWindow MainWin = MainWindow.GetMainWindow();
+        private static object LockObj = new object();
 
         public static void Run()
 		{
@@ -36,22 +35,32 @@ namespace FFXIV_TexTools
             if (result != DialogResult.OK)
                 return;
 
-            Task.Run(async () => await RunInternal(dlg.FileName));
+			_ = RunInternal(dlg.FileName);
 		}
 
 		private static async Task RunInternal(string path)
 		{ 
 			try
 			{
-				string json = File.ReadAllText(path);
+                await MainWin.LockUi("Exporting Anamnesis Character", "....", LockObj);
+
+                await Task.Delay(5000);
+
+                string json = File.ReadAllText(path);
 				CharacterFile character = JsonConvert.DeserializeObject<CharacterFile>(json);
 
                 XivRace race = character.GetXivRace();
-			}
+
+				List<IItem> allItems = await XivCache.GetFullItemList();
+            }
 			catch (Exception ex)
 			{
 				MessageBox.Show(ex.Message, "Error running export");
 			}
+            finally
+			{
+                await MainWin.UnlockUi(LockObj);
+            }
 		}
 
 		private static async Task AddToFmv(IItemModel item, XivRace race)
@@ -63,8 +72,8 @@ namespace FFXIV_TexTools
             Dictionary<int, ModelTextureData> textureData = await GetMaterials(item, model, race);
 
 			FullModelView fmv = FullModelView.Instance;
-			fmv.Owner = MainWindow.GetMainWindow();
-			fmv.Show();
+            fmv.Owner = MainWin;
+            fmv.Show();
 
 			await fmv.AddModel(model, textureData, item, race);
 		}
