@@ -219,18 +219,21 @@ namespace FFXIV_TexTools
 
             Mdl _mdl = new Mdl(GameDirectory, item.DataFile);
 
-            TTModel model = null;
+            TTModel model = await _mdl.GetModel(item, race);
 
-			List<XivRace> priority = race.GetModelPriorityList();
-            XivRace actualRace = race;
-            foreach (XivRace newRace in priority)
-			{
-                model = await _mdl.GetModel(item, newRace);
-                actualRace = newRace;
-
-                if (model != null)
+            if (model == null)
+            {
+                List<XivRace> priority = race.GetModelPriorityList();
+                XivRace actualRace = race;
+                foreach (XivRace newRace in priority)
                 {
-                    break;
+                    model = await _mdl.GetModel(item, newRace);
+                    actualRace = newRace;
+
+                    if (model != null)
+                    {
+                        break;
+                    }
                 }
             }
 
