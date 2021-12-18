@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using FFXIV_TexTools.Properties;
 using FFXIV_TexTools.Resources;
+using FFXIV_TexTools.ViewModels;
+using FFXIV_TexTools.Views;
 using FFXIV_TexTools.Views.Models;
 using Newtonsoft.Json;
 using SharpDX;
@@ -17,6 +20,7 @@ using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Models.ModelTextures;
 
 namespace FFXIV_TexTools
@@ -27,7 +31,9 @@ namespace FFXIV_TexTools
         private static MainWindow MainWin = MainWindow.GetMainWindow();
         private static object LockObj = new object();
 
-        private static FullModelView Fmv;
+        private static string name;
+        private static CharacterFile character;
+        private static List<IItem> allItems;
 
         public static void Run()
 		{
@@ -40,66 +46,40 @@ namespace FFXIV_TexTools
 			_ = RunInternal(dlg.FileName);
 		}
 
-		private static async Task RunInternal(string path)
+		private static async Task RunInternal(string inputFilePath)
 		{ 
 			try
 			{
                 await MainWin.LockUi("Exporting Anamnesis Character", "....", LockObj);
                 MainWin.LockProgress.Report("Loading chara file...");
 
-                // red chara file
-                string json = File.ReadAllText(path);
-				CharacterFile character = JsonConvert.DeserializeObject<CharacterFile>(json);
+                name = Path.GetFileNameWithoutExtension(inputFilePath);
+
+                // read chara file
+                string json = File.ReadAllText(inputFilePath);
+				character = JsonConvert.DeserializeObject<CharacterFile>(json);
                 XivRace race = character.GetXivRace();
 
                 // load all items we can
                 MainWin.LockProgress.Report("Loading items...");
-                List<IItem> allItems = await XivCache.GetFullItemList();
-
-                // load the Fmv
-                MainWin.LockProgress.Report("Starting FMV...");
-                Fmv = FullModelView.Instance;
-                Fmv.Owner = MainWin;
-                Fmv.Show();
-
-                await Task.Delay(500);
+                allItems = await XivCache.GetFullItemList();
 
                 // Body
-                MainWin.LockProgress.Report("Loading Face");
-                await AddToFmv(GetFaceModel(allItems, race, character.Head, character.Eyebrows, character.Eyes, character.Nose, character.Jaw, character.Mouth), race);
-                MainWin.LockProgress.Report("Loading Ears/Tail");
-                await AddToFmv(GetEarsTailModel(allItems, race, character.TailEarsType), race);
-                MainWin.LockProgress.Report("Loading Hair");
-                await AddToFmv(GetHairModel(allItems, race, character.Hair), race);
-
-                // Gear
-                MainWin.LockProgress.Report("Loading Item: Head");
-                await AddToFmv(GetItemModel(allItems, character.HeadGear, "Head"), race);
-                MainWin.LockProgress.Report("Loading Item: Body");
-                await AddToFmv(GetItemModel(allItems, character.Body, "Body"), race);
-                MainWin.LockProgress.Report("Loading Item: Hands");
-                await AddToFmv(GetItemModel(allItems, character.Hands, "Hands"), race);
-                MainWin.LockProgress.Report("Loading Item: Legs");
-                await AddToFmv(GetItemModel(allItems, character.Legs, "Legs"), race);
-                MainWin.LockProgress.Report("Loading Item: Feet");
-                await AddToFmv(GetItemModel(allItems, character.Feet, "Feet"), race);
-                MainWin.LockProgress.Report("Loading Item: Earring");
-                await AddToFmv(GetItemModel(allItems, character.Ears, "Earring"), race);
-                MainWin.LockProgress.Report("Loading Item: Neck");
-                await AddToFmv(GetItemModel(allItems, character.Neck, "Neck"), race);
-                MainWin.LockProgress.Report("Loading Item: Wrists");
-                await AddToFmv(GetItemModel(allItems, character.Wrists, "Wrists"), race);
-                MainWin.LockProgress.Report("Loading Item: Left Ring");
-                await AddToFmv(GetItemModel(allItems, character.LeftRing, "Rings"), race);
-                MainWin.LockProgress.Report("Loading Item: Right Ring");
-                await AddToFmv(GetItemModel(allItems, character.RightRing, "Rings"), race);
-
-                // Weapons
-                // Weapons crash the FMV, even normally a user cnat add a weapon to the FMV for some reason.
-                /*MainWin.LockProgress.Report("Loading Weapon: Main Hand");
-                await AddToFmv(GetWeaponModel(allItems, character.MainHand, true), race);
-                MainWin.LockProgress.Report("Loading Weapon: Off Hand");
-                await AddToFmv(GetWeaponModel(allItems, character.OffHand, false), race);*/
+                await Export("Face", GetFaceModel(race, character.Head, character.Eyebrows, character.Eyes, character.Nose, character.Jaw, character.Mouth), race);
+                await Export("EarsTail", GetEarsTailModel(race, character.TailEarsType), race);
+                await Export("Hair", GetHairModel(race, character.Hair), race);
+                await Export("Head", GetItemModel(character.HeadGear, "Head"), race);
+                await Export("Body", GetItemModel(character.Body, "Body"), race);
+                await Export("Hands", GetItemModel(character.Hands, "Hands"), race);
+                await Export("Legs", GetItemModel(character.Legs, "Legs"), race);
+                await Export("Feet", GetItemModel(character.Feet, "Feet"), race);
+                await Export("Earring", GetItemModel(character.Ears, "Earring"), race);
+                await Export("Neck", GetItemModel(character.Neck, "Neck"), race);
+                await Export("Wrists", GetItemModel(character.Wrists, "Wrists"), race);
+                await Export("L Ring", GetItemModel(character.LeftRing, "Rings"), race);
+                await Export("R ring", GetItemModel(character.RightRing, "Rings"), race);
+                await Export("Weapon Main", GetWeaponModel(character.MainHand, true), race);
+                await Export("Weapon Off", GetWeaponModel(character.OffHand, false), race);
             }
 			catch (Exception ex)
 			{
@@ -111,7 +91,7 @@ namespace FFXIV_TexTools
             }
 		}
 
-        private static IItemModel GetHairModel(List<IItem> allItems, XivRace race, byte hair)
+        private static IItemModel GetHairModel(XivRace race, byte hair)
 		{
             int raceCode = int.Parse(race.GetRaceCode());
 
@@ -139,7 +119,7 @@ namespace FFXIV_TexTools
             throw new Exception($"Failed to find hair model: {race}, {hair}");
         }
 
-        private static IItemModel GetFaceModel(List<IItem> allItems, XivRace race, byte head, byte eyebrows, byte eyes, byte nose, byte jaw, byte mouth)
+        private static IItemModel GetFaceModel(XivRace race, byte head, byte eyebrows, byte eyes, byte nose, byte jaw, byte mouth)
 		{
             int raceCode = int.Parse(race.GetRaceCode());
 
@@ -167,7 +147,7 @@ namespace FFXIV_TexTools
             throw new Exception($"Failed to find face model: {race}, {head}");
 		}
 
-        private static IItemModel GetEarsTailModel(List<IItem> allItems, XivRace race, byte id)
+        private static IItemModel GetEarsTailModel(XivRace race, byte id)
         {
             int raceCode = int.Parse(race.GetRaceCode());
 
@@ -198,7 +178,7 @@ namespace FFXIV_TexTools
             throw new Exception($"Failed to find Ears/Tail model: {race}, {id}");
         }
 
-        private static IItemModel GetItemModel(List<IItem> allItems, CharacterFile.ItemSave itemSave, string category)
+        private static IItemModel GetItemModel(CharacterFile.ItemSave itemSave, string category)
 		{
             if (itemSave.ModelBase == 0 && itemSave.ModelVariant == 0)
                 return null;
@@ -222,7 +202,7 @@ namespace FFXIV_TexTools
             throw new Exception($"Could not find model for item save: {itemSave}");
 		}
 
-        private static IItemModel GetWeaponModel(List<IItem> allItems, CharacterFile.WeaponSave weaponSave, bool mainHand)
+        private static IItemModel GetWeaponModel(CharacterFile.WeaponSave weaponSave, bool mainHand)
         {
             if (weaponSave.ModelSet == 0 && weaponSave.ModelBase == 0 && weaponSave.ModelVariant == 0)
                 return null;
@@ -243,23 +223,25 @@ namespace FFXIV_TexTools
             throw new Exception($"Could not find model for weapon save: {weaponSave}");
         }
 
-        private static async Task AddToFmv(IItemModel item, XivRace race)
+        private static async Task Export(string part, IItemModel item, XivRace desiredRace)
 		{
             if (item == null)
                 return;
 
+            MainWin.LockProgress.Report($"Exporting {part}: {item.Name}");
+
             Mdl _mdl = new Mdl(GameDirectory, item.DataFile);
 
-            TTModel model = await _mdl.GetModel(item, race);
-            XivRace actualRace = race;
+            TTModel model = await _mdl.GetModel(item, desiredRace);
+            XivRace modelRace = desiredRace;
 
             if (model == null)
             {
-                List<XivRace> priority = race.GetModelPriorityList();
+                List<XivRace> priority = desiredRace.GetModelPriorityList();
                 foreach (XivRace newRace in priority)
                 {
                     model = await _mdl.GetModel(item, newRace);
-                    actualRace = newRace;
+                    modelRace = newRace;
 
                     if (model != null)
                     {
@@ -271,273 +253,56 @@ namespace FFXIV_TexTools
             if (model == null)
                 throw new Exception($"Failed to get model for item: {item}");
 
-            Dictionary<int, ModelTextureData> textureData = await GetMaterials(item, model, race);
+            if (!Directory.Exists($"/{name}/{part}/"))
+                Directory.CreateDirectory($"/{name}/{part}/");
 
-			await Fmv.AddModel(model, textureData, item, actualRace);
-            await Task.Delay(4000);
-		}
+            string path = $"/{name}/{part}/{item.Name}.fbx";
 
-        // Taken from ModelViewModel:1771
-        private static async Task<Dictionary<int, ModelTextureData>> GetMaterials(IItemModel item, TTModel model, XivRace race)
-        {
-			Dictionary<int, ModelTextureData> textureDataDictionary = new Dictionary<int, ModelTextureData>();
-            if (model == null)
-                return textureDataDictionary;
+            if (desiredRace != modelRace)
+                ApplyDeformers(model, modelRace, desiredRace);
 
-			Dictionary<int, XivMtrl> mtrlDictionary = new Dictionary<int, XivMtrl>();
-			Mtrl mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-			List<string> mtrlFilePaths = model.Materials;
-
-			int materialNum = 0;
-            foreach (string mtrlFilePath in mtrlFilePaths)
-            {
-				IItemModel mtrlItem = (IItemModel)item.Clone();
-
-                int modelID = mtrlItem.ModelInfo.PrimaryID;
-				int bodyID = mtrlItem.ModelInfo.SecondaryID;
-				string filePath = mtrlFilePath;
-
-                if (!filePath.Contains("hou") && mtrlFilePath.Count(x => x == '/') > 1)
-                {
-                    filePath = mtrlFilePath.Substring(mtrlFilePath.LastIndexOf("/"));
-                }
-
-				string typeChar = $"{mtrlFilePath[4]}{mtrlFilePath[9]}";
-
-				string raceString = "";
-                switch (typeChar)
-                {
-                    // Character Body
-                    case "cb":
-						string body = mtrlFilePath.Substring(mtrlFilePath.IndexOf("b") + 1, 4);
-                        raceString = mtrlFilePath.Substring(mtrlFilePath.IndexOf("c") + 1, 4);
-
-                        // XIV automatically forces skin materials to instead reference the appropiate one for the character wearing it.
-                        race = XivRaceTree.GetSkinRace(race);
-
-
-						int gender = 0;
-                        if (int.Parse(XivRaces.GetRaceCode(race).Substring(0, 2)) % 2 == 0)
-                        {
-                            gender = 1;
-                        }
-
-						// Get the actual skin the user's preferred race uses.
-						XivRace settingsRace = XivRaceTree.GetSkinRace(GetSettingsRace(gender).Race);
-						string settingsBody = settingsRace == GetSettingsRace(gender).Race ? GetSettingsRace(gender).BodyID : "0001";
-
-						// If the user's race is a child of the item's race, we can show the user skin instead.
-						bool useSettings = XivRaceTree.IsChildOf(settingsRace, race);
-                        if (useSettings)
-                        {
-                            filePath = mtrlFilePath.Replace(raceString, settingsRace.GetRaceCode()).Replace(body, settingsBody);
-                            race = settingsRace;
-                            body = settingsBody;
-                        }
-                        else
-                        {
-                            // Just use item race.
-                            filePath = mtrlFilePath.Replace(raceString, race.GetRaceCode()).Replace(body, "0001");
-                        }
-
-                        mtrlItem = new XivGenericItemModel
-                        {
-                            PrimaryCategory = XivStrings.Character,
-                            SecondaryCategory = XivStrings.Body,
-                            Name = XivStrings.Body,
-                            ModelInfo = new XivModelInfo
-                            {
-                                SecondaryID = int.Parse(body)
-                            }
-                        };
-
-                        break;
-                    // Face
-                    case "cf":
-                        bodyID = int.Parse(mtrlFilePath.Substring(mtrlFilePath.IndexOf("f") + 1, 4));
-                        raceString = mtrlFilePath.Substring(mtrlFilePath.IndexOf("c") + 1, 4);
-                        race = XivRaces.GetXivRace(raceString);
-
-                        mtrlItem = new XivGenericItemModel
-                        {
-                            PrimaryCategory = XivStrings.Character,
-                            SecondaryCategory = XivStrings.Face,
-                            Name = XivStrings.Face,
-                            ModelInfo = new XivModelInfo
-                            {
-                                SecondaryID = bodyID
-                            }
-                        };
-
-                        break;
-                    // Hair
-                    case "ch":
-                        bodyID = int.Parse(mtrlFilePath.Substring(mtrlFilePath.IndexOf("h") + 1, 4));
-                        raceString = mtrlFilePath.Substring(mtrlFilePath.IndexOf("c") + 1, 4);
-                        race = XivRaces.GetXivRace(raceString);
-
-                        mtrlItem = new XivGenericItemModel
-                        {
-                            PrimaryCategory = XivStrings.Character,
-                            SecondaryCategory = XivStrings.Hair,
-                            Name = XivStrings.Hair,
-                            ModelInfo = new XivModelInfo
-                            {
-                                SecondaryID = bodyID
-                            }
-                        };
-
-                        break;
-                    // Tail
-                    case "ct":
-						string tempPath = mtrlFilePath.Substring(4);
-                        bodyID = int.Parse(tempPath.Substring(tempPath.IndexOf("t") + 1, 4));
-                        raceString = mtrlFilePath.Substring(mtrlFilePath.IndexOf("c") + 1, 4);
-                        race = XivRaces.GetXivRace(raceString);
-
-                        mtrlItem = new XivGenericItemModel
-                        {
-                            PrimaryCategory = XivStrings.Character,
-                            SecondaryCategory = XivStrings.Tail,
-                            Name = XivStrings.Tail,
-                            ModelInfo = new XivModelInfo
-                            {
-                                SecondaryID = bodyID
-                            }
-                        };
-
-                        break;
-                    // Ears
-                    case "cz":
-						string tPath = mtrlFilePath.Substring(4);
-                        bodyID = int.Parse(tPath.Substring(tPath.IndexOf("z") + 1, 4));
-                        raceString = mtrlFilePath.Substring(mtrlFilePath.IndexOf("c") + 1, 4);
-                        race = XivRaces.GetXivRace(raceString);
-
-                        mtrlItem = new XivGenericItemModel
-                        {
-                            PrimaryCategory = XivStrings.Character,
-                            SecondaryCategory = XivStrings.Ear,
-                            Name = XivStrings.Ear,
-                            ModelInfo = new XivModelInfo
-                            {
-                                SecondaryID = bodyID
-                            }
-                        };
-
-                        break;
-                    // Equipment
-                    case "ce":
-                        modelID = int.Parse(mtrlFilePath.Substring(mtrlFilePath.IndexOf("e") + 1, 4));
-                        raceString = mtrlFilePath.Substring(mtrlFilePath.IndexOf("c") + 1, 4);
-                        race = XivRaces.GetXivRace(raceString);
-
-                        mtrlItem.ModelInfo.PrimaryID = modelID;
-                        break;
-                    // Accessory
-                    case "ca":
-                        modelID = int.Parse(mtrlFilePath.Substring(mtrlFilePath.IndexOf("a") + 1, 4));
-                        raceString = mtrlFilePath.Substring(mtrlFilePath.IndexOf("c") + 1, 4);
-                        race = XivRaces.GetXivRace(raceString);
-
-                        mtrlItem.ModelInfo.PrimaryID = modelID;
-                        break;
-                    // Weapon
-                    case "wb":
-                        modelID = int.Parse(mtrlFilePath.Substring(mtrlFilePath.IndexOf("w") + 1, 4));
-                        bodyID = int.Parse(mtrlFilePath.Substring(mtrlFilePath.IndexOf("b") + 1, 4));
-                        mtrlItem.ModelInfo.PrimaryID = modelID;
-                        mtrlItem.ModelInfo.SecondaryID = bodyID;
-                        break;
-                    // Monster
-                    case "mb":
-                        modelID = int.Parse(mtrlFilePath.Substring(mtrlFilePath.IndexOf("_m") + 2, 4));
-                        bodyID = int.Parse(mtrlFilePath.Substring(mtrlFilePath.IndexOf("b") + 1, 4));
-                        mtrlItem.ModelInfo.PrimaryID = modelID;
-                        mtrlItem.ModelInfo.SecondaryID = bodyID;
-                        break;
-                    // DemiHuman
-                    case "de":
-                        modelID = int.Parse(mtrlFilePath.Substring(mtrlFilePath.IndexOf("d") + 1, 4));
-                        bodyID = int.Parse(mtrlFilePath.Substring(mtrlFilePath.IndexOf("e") + 1, 4));
-                        mtrlItem.ModelInfo.PrimaryID = modelID;
-                        mtrlItem.ModelInfo.SecondaryID = bodyID;
-                        break;
-                    default:
-                        break;
-                }
-
-				int dxVersion = int.Parse(Settings.Default.DX_Version);
-				XivMtrl mtrlData = await mtrl.GetMtrlData(mtrlItem, filePath, dxVersion);
-
-                if (mtrlData == null)
-                    continue;
-
-                mtrlDictionary.Add(materialNum, mtrlData);
-                materialNum++;
-            }
-
-            foreach (KeyValuePair<int, XivMtrl> xivMtrl in mtrlDictionary)
-            {
-				CustomModelColors colors = ModelTexture.GetCustomColors();
-                colors.InvertNormalGreen = false;
-
-				ModelTextureData modelMaps = await ModelTexture.GetModelMaps(GameDirectory, xivMtrl.Value, colors);
-                textureDataDictionary.Add(xivMtrl.Key, modelMaps);
-            }
-
-            return textureDataDictionary;
+            await _mdl.ExportModel(model, path);
         }
 
         /// <summary>
-        /// Gets the race from the settings
+        /// Applies the deformer to a model
         /// </summary>
-        /// <param name="gender">The gender of the currently selected race</param>
-        /// <returns>A tuple containing the race and body</returns>
-        private static (XivRace Race, string BodyID) GetSettingsRace(int gender)
+        /// <param name="model">The model being deformed</param>
+        /// <param name="currentRace">The current model race</param>
+        /// <param name="targetRace">The target race to convert the model to</param>
+        private static void ApplyDeformers(TTModel model, XivRace currentRace, XivRace targetRace)
         {
-			string settingsRace = Settings.Default.Default_Race;
-			string defaultBody = "0001";
-
-            if (settingsRace.Equals(XivStringRaces.Hyur_M))
+        
+            // Current race is already parent node
+            // Direct conversion
+            // [ Current > (apply deform) > Target ]
+            if (currentRace.IsDirectParentOf(targetRace))
             {
-                if (gender == 0)
-                {
-                    return (XivRaces.GetXivRace("0101"), defaultBody);
-                }
+                ModelModifiers.ApplyRacialDeform(model, targetRace);
             }
-
-            if (settingsRace.Equals(XivStringRaces.Hyur_H))
+            // Target race is parent node of Current race
+            // Convert to parent (invert deform)
+            // [ Current > (apply inverse deform) > Target ]
+            else if (targetRace.IsDirectParentOf(currentRace))
             {
-                if (gender == 0)
-                {
-                    return (XivRaces.GetXivRace("0301"), defaultBody);
-                }
-
-                return (XivRaces.GetXivRace("0401"), defaultBody);
+                ModelModifiers.ApplyRacialDeform(model, currentRace, true);
             }
-
-            if (settingsRace.Equals(XivStringRaces.Aura_R))
+            // Current race is not parent of Target Race and Current race has parent
+            // Make a recursive call with the current races parent race
+            // [ Current > (apply inverse deform) > Current.Parent > Recursive Call ]
+            else if (currentRace.GetNode().Parent != null)
             {
-                if (gender == 0)
-                {
-                    return (XivRaces.GetXivRace("1301"), defaultBody);
-                }
-
-                return (XivRaces.GetXivRace("1401"), defaultBody);
+                ModelModifiers.ApplyRacialDeform(model, currentRace, true);
+                ApplyDeformers(model, currentRace.GetNode().Parent.Race, targetRace);
             }
-
-            if (settingsRace.Equals(XivStringRaces.Aura_X))
+            // Current race has no parent
+            // Make a recursive call with the target races parent race
+            // [ Target > (apply deform on Target.Parent) > Target.Parent > Recursive Call ]
+            else
             {
-                if (gender == 0)
-                {
-                    return (XivRaces.GetXivRace("1301"), "0101");
-                }
-
-                return (XivRaces.GetXivRace("1401"), "0101");
+                ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race);
+                ApplyDeformers(model, targetRace.GetNode().Parent.Race, targetRace);
             }
-
-            return (XivRaces.GetXivRace("0201"), defaultBody);
         }
 
         [Serializable]
