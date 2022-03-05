@@ -262,6 +262,27 @@ namespace FFXIV_TexTools
                 ApplyDeformers(model, modelRace, desiredRace);
 
             await _mdl.ExportModel(model, path);
+
+            MainWin.LockProgress.Report($"Converting Normals {part}: {item.Name}");
+
+            string[] normalMaps = Directory.GetFiles(Path.GetDirectoryName(path), "*_n.png");
+            foreach (string normalMap in normalMaps)
+            {
+                string disMap = normalMap.Replace("_n.png", "_dis.png");
+
+                ProcessStartInfo processStartInfo = new ProcessStartInfo();
+                processStartInfo.FileName = "NormalToHeight.exe";
+                processStartInfo.Arguments = $"{normalMap} {disMap} -normalise";
+                processStartInfo.CreateNoWindow = true;
+                processStartInfo.WindowStyle = ProcessWindowStyle.Hidden;
+
+                Process proc = Process.Start(processStartInfo);
+
+                while (!proc.HasExited)
+                {
+                    await Task.Delay(100);
+                }
+            }
         }
 
         /// <summary>
