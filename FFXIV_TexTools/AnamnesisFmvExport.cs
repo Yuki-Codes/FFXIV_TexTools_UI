@@ -149,6 +149,15 @@ namespace FFXIV_TexTools
 
         private static IItemModel GetEarsTailModel(XivRace race, byte id)
         {
+            // only au ra, miqote, and viera have ears or tail models.
+            if (race != XivRace.AuRa_Female
+                && race != XivRace.AuRa_Male
+                && race != XivRace.Miqote_Female
+                && race != XivRace.Miqote_Male
+                && race != XivRace.Viera_Female
+                && race != XivRace.Viera_Male)
+                return null;
+
             int raceCode = int.Parse(race.GetRaceCode());
 
             if (id == 0)
