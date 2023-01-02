@@ -438,7 +438,7 @@ namespace FFXIV_TexTools.Views.Controls
                 }
                 catch (Exception ex)
                 {
-                    FlexibleMessageBox.Show("An error occurred while loading the item list.\n" + ex.Message, "Item List Error", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning);
+                    FlexibleMessageBox.Show("An error occurred while loading the item list.\n".L() + ex.Message, "Item List Error".L(), System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -586,7 +586,7 @@ namespace FFXIV_TexTools.Views.Controls
                 }
                 else
                 {
-                    if (item.Name == e.Item.Name)
+                    if (item.Name == e.Item?.Name)
                     {
                         return e;
                     }
@@ -783,13 +783,15 @@ namespace FFXIV_TexTools.Views.Controls
                 {XivStrings.Neck },
                 {XivStrings.Wrists },
                 {XivStrings.Rings },
-                {XivStrings.Body_Hands_Legs_Feet },
+                {XivStrings.Head_Body },
+                {XivStrings.Body_Hands },               
                 {XivStrings.Body_Hands_Legs },
                 {XivStrings.Body_Legs_Feet },
-                {XivStrings.Head_Body },
+                {XivStrings.Body_Hands_Legs_Feet },
                 {XivStrings.Legs_Feet },
                 {XivStrings.All },
                 {XivStrings.Food }
+                
             } },
             { XivStrings.Character, new List<string>() {
                 /*{ XivStrings.Body },
