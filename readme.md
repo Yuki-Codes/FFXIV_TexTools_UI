@@ -13,9 +13,8 @@ Bugs can reported on our Github [Issues Page](https://github.com/TexTools/FFXIV_
 ## System Requirements
 
 - Windows 7 SP1, Windows 8.1 and Windows 10 19h1 (18362) or higher (32 or 64 bit)
-- All users require [Visual C++ 2019+ x64 and x86 as well as Visual Studio 2012 Update 4 Redistributables](https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
-- Windows 7 SP1 and 8.1 users need to have [.Net Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework/net48) installed.
-  - Windows 10 19h1 has this included, users on early versions of Windows 10 are advised to update instead of installing the 4.8 installable. 
+- All users require [Visual C++ 2022+ x64 and x86 as well as Visual Studio 2012 Update 4 Redistributables](https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
+- All Users need to have [.Net Framework 4.8.1](https://dotnet.microsoft.com/download/dotnet-framework/net481) installed.
 - Windows 7 SP1 requires the [Platform Update for Windows 7 (KB2670838)](https://www.microsoft.com/en-au/download/details.aspx?id=36805)
   - Some users will need to uninstall this KB patch and reinstall it due to known/resolved cases where some of the subdependencies were blocked due to outdated/broken display drivers.
   - The installation of this update will also result in a number of other KB updates to present themselves on Windows update, install these to resolve Font clarity, security and stability issues.
@@ -31,7 +30,14 @@ Bugs can reported on our Github [Issues Page](https://github.com/TexTools/FFXIV_
 - Microsoft OneDrive based user profiles can cause files saved into the default location to be reverted. 
   - You can either exclude this folder from the OneDrive interface, or change the Modpacks, Index(Backups) and Saved locations to another folder from the customise screen.
 - Regions currently on 5.5x will experience issues using versions of TexTools updated for Global 6.0
-  - Using an older, or custom version of the current client is the only Workaround. 
+  - Using an older, or custom version of the current client is the only Workaround.
+  
+### WARNING
+
+We do not support the use of Textools from, or with application directories placed inside a Onedrive folder, This includes the default User Profile folder created if users blindly click through the first time wizard on a new Windows install.
+
+- These services can cause backup files, and mods themselves to revert or only partially synchronise, resulting in file corruption.
+- In other cases, files are not able to be loaded at all because the one drive service has been disabled or uninstalled, in this case a big error message that includes the line "Cloud File Provider is not running." to be thrown when attempting to import, export or create packs.
 
 ## Useful Links
 - [Official TexTools Discord](https://discord.gg/ffxivtextools)
